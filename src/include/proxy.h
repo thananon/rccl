@@ -305,6 +305,10 @@ struct ncclProxyState {
 
   // Queue of expected responses from the proxy
   struct ncclExpectedProxyResponse* expectedResponses;
+
+  // proxy logging
+  struct *ncclProxyArgs logs;
+  int log_index;
 };
 
 enum proxyConnectState {

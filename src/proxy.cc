@@ -22,6 +22,7 @@
 #include <sys/time.h>
 
 /* RCCL Proxy Monitor */
+RCCL_PARAM(ProxyLogSize, "PROXY_LOG_SIZE", 0);
 RCCL_PARAM(ProxyMonitorInterval, "PROXY_MONITOR_INTERVAL", 0);
 static ncclProxyProgressState* ncclLastProxyState;
 static pthread_t proxyMonitorThread;
@@ -667,6 +668,7 @@ static ncclResult_t progressOps(struct ncclProxyState* proxyState, struct ncclPr
   struct ncclProxyArgs* op = opStart;
   while (op) {
     op->retry_total++;
+    rcclProxyLog(proxyState, op);
     if (op->state == ncclProxyOpNone) return ncclInternalError;
     TIME_START(0); TIME_START(1);
     NCCLCHECK(op->progress(proxyState, op));
@@ -921,6 +923,34 @@ ncclResult_t ncclProxyProgressDestroy(struct ncclProxyState* proxyState) {
 
   ncclProfilingDump();
   TIME_PRINT("Proxy");
+  return ncclSuccess;
+}
+
+static ncclResult_t rcclProxyLog(struct ncclProxyState* proxyState, struct ncclProxyArgs *args) {
+
+  if (rcclParamProxyLogSize() > 0) {
+    int *index = proxyState->log_index;
+    proxyState->logs[*index] = *args;
+    *index = (*index)+1 % rcclParamProxyLogSize();
+  }
+  return ncclSuccess;
+}
+
+static ncclResult_t rcclProxyLogCreate(struct ncclProxyState* proxyState) {
+
+  if (rcclParamProxyLogSize() == 0) return ncclSuccess;
+
+  size_t log_size = sizeof(struct ncclProxyArgs) * rcclParamProxyLogSize();
+  proxyState->logs = (struct ncclProxyArgs*) malloc (log_size);
+  memset(0, proxyState->logs, log_size);
+  proxyState->log_index = 0;
+
+}
+
+ncclResult_t rcclProxyLogDestroy(struct ncclProxyState* proxyState) {
+  if (rcclParamProxyLogSize() > 0) {
+    free(proxyState->logs);
+  }
   return ncclSuccess;
 }
 
@@ -1721,8 +1751,7 @@ ncclResult_t ncclProxyCreate(struct ncclComm* comm) {
     pthread_create(&comm->proxyState->threadUDS, NULL, ncclProxyServiceUDS, comm->proxyState);
     ncclSetThreadName(comm->proxyState->threadUDS, "NCCL UDS Service %2d", comm->cudaDev);
 
-    // Monitoring
-    rcclProxyMonitorCreate();
+    rcclProxyLogCreate(proxyState);
   }
   return ncclSuccess;
 }
@@ -1770,7 +1799,7 @@ ncclResult_t ncclProxyStop(struct ncclComm* comm) {
     }
   }
 
-  rcclProxyMonitorDestroy();
+  rcclProxyLogDestroy();
   return ncclSuccess;
 }
 
