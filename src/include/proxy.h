@@ -77,7 +77,7 @@ struct ncclProxyOp {
   int peer;
   int rank;
   uint64_t tail;
-  uint64_t gputail;
+  uint64_t recvtail;
 
   union ncclProxyOpSpecifics specifics;
 
@@ -155,7 +155,7 @@ struct ncclProxyArgs {
   int rank;
   int send;
   uint64_t tail;
-  uint64_t gputail;
+  uint64_t recvtail;
   int retry_total;
 };
 #define NCCL_MAX_NETDEVS 128
@@ -307,8 +307,8 @@ struct ncclProxyState {
   struct ncclExpectedProxyResponse* expectedResponses;
 
   // proxy logging
-  struct *ncclProxyArgs logs;
-  int log_index;
+  struct ncclProxyArgs* logs;
+  int logIndex;
 };
 
 enum proxyConnectState {

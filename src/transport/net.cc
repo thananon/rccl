@@ -1233,7 +1233,7 @@ static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct 
         volatile uint64_t* recvTail = &resources->recvMem->tail;
         uint64_t tail = sub->base + (sub->reg ? 0 : sub->transmitted);
 	args->tail = tail;
-	args->gputail = *recvTail;
+	args->recvtail = *recvTail;
         if ((sub->reg || connFifo[buffSlot].size != -1) && ((*recvTail > tail) || p == NCCL_PROTO_LL)) {
           // We have something to receive, let's check if it's completely ready.
           int size = sub->reg ? std::min(MAX_NET_SIZE, sub->nbytes) : connFifo[buffSlot].size;
@@ -1667,6 +1667,7 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
               } else
                 *recvTail = sub->base + sub->transmitted;
               if (resources->gdcSync) wc_store_fence(); // Flush out WC write
+	      args->recvtail = *recvTail;
             }
           }
           args->idle = 0;

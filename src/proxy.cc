@@ -23,6 +23,9 @@
 
 /* RCCL Proxy Monitor */
 RCCL_PARAM(ProxyLogSize, "PROXY_LOG_SIZE", 0);
+static ncclResult_t rcclProxyLog(struct ncclProxyState* proxyState, struct ncclProxyArgs *args);
+ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex);
+
 RCCL_PARAM(ProxyMonitorInterval, "PROXY_MONITOR_INTERVAL", 0);
 static ncclProxyProgressState* ncclLastProxyState;
 static pthread_t proxyMonitorThread;
@@ -255,7 +258,7 @@ ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex) 
   int peer = op->peer;
   bool isColl = (op->pattern != ncclPatternRecv) && (op->pattern != ncclPatternSend);
 
-  fprintf(stderr, "%p [%d-%d|%ld| %s",op, poolIndex, opIndex, op->opCount, isColl ? "Coll->" : "");
+  fprintf(stderr, "%p [%d-%d|%ld| coll:%d dtype:%d redOp:%d proto:%d ",op, poolIndex, opIndex, op->opCount, isColl ? op->coll : -1, op->dtype, op->redOp, op->protocol);
   fprintf(stderr, "%s", op->send ? "Send" : "Recv");
   for (int s=0; s<op->nsubs; s++) {
     struct ncclProxySubArgs* sub = op->subs+s;
@@ -277,7 +280,7 @@ ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex) 
 	// Send or recv within a collective. Dump raw state data.
 	fprintf(stderr, " nb:%zd ns:%d p:%lu t:%lu r:%lu, d:%lu ",sub->nbytes,sub->nsteps, sub->posted, sub->transmitted, sub->received, sub->done);
       }
-      fprintf(stderr, "%c peer:%d chan:%d myrank:%d tail=%zd gputail=%zd proto=%d ", status, peer, sub->channelId, op->rank, op->tail, op->gputail, op->protocol);
+      fprintf(stderr, "%c peer:%d chan:%d myrank:%d tail:%lu recvtail:%lu ", status, peer, sub->channelId, op->rank, op->tail, op->recvtail);
     } else {
         if (op->state == ncclProxyOpNone) fprintf(stderr, "\t[]");
         else if (op->state == ncclProxyOpReady) fprintf(stderr, "\t[R]");
@@ -421,6 +424,9 @@ static ncclResult_t ncclProxyOpToArgs(struct ncclProxyOp* op, struct ncclProxyAr
   args->proxyAppendPtr = op->connection->proxyAppendPtr;
   args->send = op->connection->send;
   args->peer = op->peer;
+  args->rank = op->rank;
+  args->tail = op->tail;
+  args->recvtail = op->recvtail;
   args->retry_total = 0;
   return ncclSuccess;
 }
@@ -554,7 +560,7 @@ static ncclResult_t SaveProxy(struct ncclComm* comm, struct ncclChannel* channel
     op->peer = peer;
     op->rank = comm->rank;
     op->tail = 0;
-    op->gputail = 0;
+    op->recvtail = 0;
     NCCLCHECK(ncclLocalOpAppend(comm, &connector->proxyConn, op));
   }
   return ncclSuccess;
@@ -929,10 +935,28 @@ ncclResult_t ncclProxyProgressDestroy(struct ncclProxyState* proxyState) {
 static ncclResult_t rcclProxyLog(struct ncclProxyState* proxyState, struct ncclProxyArgs *args) {
 
   if (rcclParamProxyLogSize() > 0) {
-    int *index = proxyState->log_index;
-    proxyState->logs[*index] = *args;
-    *index = (*index)+1 % rcclParamProxyLogSize();
+    memcpy(proxyState->logs + proxyState->logIndex, args, sizeof (ncclProxyArgs));
+    proxyState->logIndex = (proxyState->logIndex + 1) % rcclParamProxyLogSize();
   }
+  return ncclSuccess;
+}
+
+ncclResult_t rcclProxyLogDump(struct ncclComm* comm) {
+
+  struct ncclProxyState* proxyState = comm->proxyState;
+  fprintf(stderr, "Proxy Log for comm: %p (last %ld entries)\n", comm, rcclParamProxyLogSize());
+
+  // dump from index (oldest) --> end of list
+  for (int i=proxyState->logIndex; i < rcclParamProxyLogSize(); i++) {
+    printProxyOp(&proxyState->logs[i], 0, 0);
+  }
+
+  // dump from 0 --> index-1
+  for (int i=0; i < proxyState->logIndex ;i++) {
+    printProxyOp(&proxyState->logs[i], 0, 0);
+  }
+
+  fprintf(stderr, "\n");
   return ncclSuccess;
 }
 
@@ -942,9 +966,10 @@ static ncclResult_t rcclProxyLogCreate(struct ncclProxyState* proxyState) {
 
   size_t log_size = sizeof(struct ncclProxyArgs) * rcclParamProxyLogSize();
   proxyState->logs = (struct ncclProxyArgs*) malloc (log_size);
-  memset(0, proxyState->logs, log_size);
-  proxyState->log_index = 0;
+  memset(proxyState->logs, 0, log_size);
+  proxyState->logIndex = 0;
 
+  return ncclSuccess;
 }
 
 ncclResult_t rcclProxyLogDestroy(struct ncclProxyState* proxyState) {
@@ -1799,7 +1824,8 @@ ncclResult_t ncclProxyStop(struct ncclComm* comm) {
     }
   }
 
-  rcclProxyLogDestroy();
+  rcclProxyLogDump(comm);
+  rcclProxyLogDestroy(comm->proxyState);
   return ncclSuccess;
 }
 
