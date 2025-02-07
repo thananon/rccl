@@ -151,6 +151,7 @@ struct ncclProxyArgs {
 
   union ncclProxyOpSpecifics specifics;
 
+  void *self;
   int peer;
   int rank;
   int send;

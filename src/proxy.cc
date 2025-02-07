@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 
-/* RCCL Proxy Monitor */
+/* RCCL Proxy Debug tools. */
 RCCL_PARAM(ProxyLogSize, "PROXY_LOG_SIZE", 0);
 static ncclResult_t rcclProxyLog(struct ncclProxyState* proxyState, struct ncclProxyArgs *args);
 ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex);
@@ -30,7 +30,6 @@ RCCL_PARAM(ProxyMonitorInterval, "PROXY_MONITOR_INTERVAL", 0);
 static ncclProxyProgressState* ncclLastProxyState;
 static pthread_t proxyMonitorThread;
 int proxyMonitorInit = 0;
-/**/
 
 static bool NeedProxy(int type, int pattern, int root, struct ncclRing* ring, int nranks) {
   if (pattern == ncclPatternRing || pattern == ncclPatternRingTwice) return true;
@@ -258,8 +257,9 @@ ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex) 
   int peer = op->peer;
   bool isColl = (op->pattern != ncclPatternRecv) && (op->pattern != ncclPatternSend);
 
-  fprintf(stderr, "%p [%d-%d|%ld| coll:%d dtype:%d redOp:%d proto:%d ",op, poolIndex, opIndex, op->opCount, isColl ? op->coll : -1, op->dtype, op->redOp, op->protocol);
-  fprintf(stderr, "%s", op->send ? "Send" : "Recv");
+  fprintf(stderr, "%p [%d-%d|%ld| coll:%d [%s] dtype:%d redOp:%d proto:%d ",
+		  op->self, poolIndex, opIndex, op->opCount, isColl ? op->coll : -1,
+		  op->send ? "SEND" : "RECV", op->dtype, op->redOp, op->protocol);
   for (int s=0; s<op->nsubs; s++) {
     struct ncclProxySubArgs* sub = op->subs+s;
     if (op->state == ncclProxyOpProgress) {
@@ -428,6 +428,7 @@ static ncclResult_t ncclProxyOpToArgs(struct ncclProxyOp* op, struct ncclProxyAr
   args->tail = op->tail;
   args->recvtail = op->recvtail;
   args->retry_total = 0;
+  args->self = args;
   return ncclSuccess;
 }
 
@@ -943,6 +944,8 @@ static ncclResult_t rcclProxyLog(struct ncclProxyState* proxyState, struct ncclP
 
 ncclResult_t rcclProxyLogDump(struct ncclComm* comm) {
 
+  if (rcclParamProxyLogSize() == 0) return ncclSuccess;
+
   struct ncclProxyState* proxyState = comm->proxyState;
   fprintf(stderr, "Proxy Log for comm: %p (last %ld entries)\n", comm, rcclParamProxyLogSize());
 
@@ -1011,6 +1014,8 @@ static ncclResult_t rcclProxyMonitorCreate() {
 }
 
 ncclResult_t rcclProxyMonitorDestroy() {
+  if (!proxyMonitorInit) return ncclSuccess;
+
   proxyMonitorInit = 0;
   pthread_join(proxyMonitorThread, NULL);
   return ncclSuccess;
@@ -1776,6 +1781,7 @@ ncclResult_t ncclProxyCreate(struct ncclComm* comm) {
     pthread_create(&comm->proxyState->threadUDS, NULL, ncclProxyServiceUDS, comm->proxyState);
     ncclSetThreadName(comm->proxyState->threadUDS, "NCCL UDS Service %2d", comm->cudaDev);
 
+    rcclProxyMonitorCreate();
     rcclProxyLogCreate(proxyState);
   }
   return ncclSuccess;
@@ -1826,6 +1832,7 @@ ncclResult_t ncclProxyStop(struct ncclComm* comm) {
 
   rcclProxyLogDump(comm);
   rcclProxyLogDestroy(comm->proxyState);
+  rcclProxyMonitorDestroy();
   return ncclSuccess;
 }
 
