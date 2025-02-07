@@ -278,9 +278,11 @@ ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex) 
         else status = 'D'; // Done
       } else {
 	// Send or recv within a collective. Dump raw state data.
-	fprintf(stderr, " nb:%zd ns:%d p:%lu t:%lu r:%lu, d:%lu ",sub->nbytes,sub->nsteps, sub->posted, sub->transmitted, sub->received, sub->done);
+	fprintf(stderr, " nb:%zd ns:%d p:%lu t:%lu r:%lu, d:%lu ",
+		      sub->nbytes,sub->nsteps, sub->posted, sub->transmitted, sub->received, sub->done);
       }
-      fprintf(stderr, "%c myrank:%d peer:%d chan:%d tail:%lu recvtail:%lu reg:%d ", status,op->rank, peer, sub->channelId, op->tail, op->recvtail, sub->reg);
+      fprintf(stderr, "%c myrank:%d peer:%d chan:%d tail:%lu recvtail:%lu reg:%d connSz:%zd", 
+		      status,op->rank, peer, sub->channelId, op->tail, op->recvtail, sub->reg, op->connFifoSize);
     } else {
         if (op->state == ncclProxyOpNone) fprintf(stderr, "\t[]");
         else if (op->state == ncclProxyOpReady) fprintf(stderr, "\t[R]");

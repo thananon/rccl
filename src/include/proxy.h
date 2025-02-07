@@ -157,6 +157,7 @@ struct ncclProxyArgs {
   int send;
   uint64_t tail;
   uint64_t recvtail;
+  size_t connFifoSize;
   int retry_total;
 };
 #define NCCL_MAX_NETDEVS 128

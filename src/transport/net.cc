@@ -1234,6 +1234,7 @@ static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct 
         uint64_t tail = sub->base + (sub->reg ? 0 : sub->transmitted);
 	args->tail = tail;
 	args->recvtail = *recvTail;
+	args->connFifoSize = connFifo[buffSlot].size;
         if ((sub->reg || connFifo[buffSlot].size != -1) && ((*recvTail > tail) || p == NCCL_PROTO_LL)) {
           // We have something to receive, let's check if it's completely ready.
           int size = sub->reg ? std::min(MAX_NET_SIZE, sub->nbytes) : connFifo[buffSlot].size;
@@ -1472,6 +1473,7 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
           char* localBuff = NCCL_NET_MAP_GET_POINTER(&resources->map, cpu, buffs[p]);
           int buffSlot = (sub->base+sub->posted)%NCCL_STEPS;
           volatile struct ncclConnFifo* connFifo = (volatile struct ncclConnFifo*)resources->recvMem->connFifo;
+	  args->connFifoSize = connFifo[sub->base%NCCL_STEPS].size;
           if (p == NCCL_PROTO_SIMPLE && resources->shared) {
             if (sub->reg) {
               // Wait until CUDA kernel has started before we access the user buffer directly.
