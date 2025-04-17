@@ -78,6 +78,7 @@ struct ncclProxyOp {
   int rank;
   uint64_t tail;
   uint64_t recvtail;
+  ncclComm *comm;
 
   union ncclProxyOpSpecifics specifics;
 
@@ -157,6 +158,7 @@ struct ncclProxyArgs {
   int send;
   uint64_t tail;
   uint64_t recvtail;
+  ncclComm *comm;
   size_t connFifoSize;
   int retry_total;
 };

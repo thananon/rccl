@@ -21,6 +21,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 
+extern void *ncclCommThreadMain(void *arg);
+
 /* RCCL Proxy Debug tools. */
 RCCL_PARAM(ProxyLogSize, "PROXY_LOG_SIZE", 0);
 static ncclResult_t rcclProxyLog(struct ncclProxyState* proxyState, struct ncclProxyArgs *args);
@@ -299,6 +301,7 @@ ncclResult_t dumpProxyState(struct ncclProxyProgressState* state) {
   int poolIndex, opIndex;
   int list_len = 0;
   int sublist_len = 0;
+  ncclCommThreadMain((void*)op->comm);
   fprintf(stderr, "ACTIVE OPS\n");
   while (op) {
     sublist_len = 0;
@@ -429,6 +432,7 @@ static ncclResult_t ncclProxyOpToArgs(struct ncclProxyOp* op, struct ncclProxyAr
   args->rank = op->rank;
   args->tail = op->tail;
   args->recvtail = op->recvtail;
+  args->comm = op->comm;
   args->retry_total = 0;
   args->self = args;
   return ncclSuccess;
@@ -564,6 +568,7 @@ static ncclResult_t SaveProxy(struct ncclComm* comm, struct ncclChannel* channel
     op->rank = comm->rank;
     op->tail = 0;
     op->recvtail = 0;
+    op->comm = comm;
     NCCLCHECK(ncclLocalOpAppend(comm, &connector->proxyConn, op));
   }
   return ncclSuccess;
@@ -1670,6 +1675,7 @@ void* ncclProxyService(void* _args) {
     }
   }
 
+  hipDeviceSynchronize();
   // Wait for all operations to complete and stop progress thread before freeing any resource
   if (ncclProxyProgressDestroy(proxyState) != ncclSuccess) {
     WARN("[Proxy Service] proxyDestroy failed");
