@@ -102,7 +102,7 @@ private:
 #if defined(__gfx1200__) || defined(__gfx1201__)
     return __atomic_load_n(ptr, __ATOMIC_ACQUIRE);
 #else
-    return __atomic_load_n(ptr, __ATOMIC_RELAXED);
+    return __atomic_load_n(ptr, __ATOMIC_ACQUIRE);
 #endif
   }
 
@@ -114,15 +114,25 @@ private:
     if (((flags & (Recv*RoleWaitRecv)) && !noRecvWait) ||
         ((flags & (Send*RoleWaitSend)) && !noSendWait)) {
       int spins = 0;
+      int printed = 0;
+      int print_every = 1;
+      uint64_t loopcount = 0;
       repeat = 50;
       while (connStepCache + (isSendNotRecv ? NCCL_STEPS : 0) < step + StepPerSlice) {
         __builtin_amdgcn_s_sleep(1);
         connStepCache = loadStepValue(connStepPtr);
         if (checkAbort(spins)) break;
         //if (spins == 0) printf("r=%d b=%d t=%d SPUN OUT got=%d want=%d\n", ncclShmem.comm.rank, blockIdx.x, threadIdx.x, int(connStepCache + (isSendNotRecv ? NCCL_STEPS : 0)), int(step+StepPerSlice));
-        if (spins == 0 && repeat > 0) {
-          repeat --;
-          traceData(__LINE__, threadIdx.x, int(connStepCache + (isSendNotRecv ? NCCL_STEPS : 0)), int(step+StepPerSlice));
+        loopcount++;
+        if (spins == 0 && !(loopcount % print_every)) {
+          if (printed < 3) {
+            // but print only 3 times per level
+            printed++;
+            traceData(__LINE__, threadIdx.x, int(connStepCache + (isSendNotRecv ? NCCL_STEPS : 0)), int(step+StepPerSlice));
+          } else {
+            print_every *= 2;
+            printed = 0;
+          }
         }
       }
       __asm__ __volatile__("s_wakeup");

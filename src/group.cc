@@ -241,12 +241,15 @@ static ncclResult_t doLaunches(struct ncclComm* head) {
           if (plan != nullptr) {
             comm->planner.unlaunchedPlansHead = plan->next;
             CUDACHECKGOTO(cudaSetDevice(comm->cudaDev), result, failure);
+            INFO(NCCL_COLL, "ncclLaunchKernelBefore");
             NCCLCHECKGOTO(ncclLaunchKernelBefore_NoUncapturedCuda(comm, plan), result, failure);
+            INFO(NCCL_COLL, "ncclLaunchKernel");
             NCCLCHECKGOTO(ncclLaunchKernel(comm, plan), result, failure);
           }
           // Barrier reduction input indicates if we require further rounds.
           if (useBarrier) ncclCommIntraBarrierIn(comm, comm->planner.unlaunchedPlansHead != nullptr ? 1 : 0);
           if (plan != nullptr) {
+            INFO(NCCL_COLL, "ncclLaunchKernelAfter");
             NCCLCHECKGOTO(ncclLaunchKernelAfter_NoCuda(comm, plan), result, failure);
           }
         } else { // Final round.
@@ -563,6 +566,7 @@ ncclResult_t ncclGroupEndInternal(ncclSimInfo_t* simInfo) {
       ret = ncclInProgress;
     } else {
       /* blocking group */
+      INFO(NCCL_COLL, "calling groupLaunch..");
       NCCLCHECKGOTO(groupLaunch(&ncclGroupJobMainPtr->base, internalSimInfoPtr), ret, fail);
       if (simInfo) memcpy((void*)simInfo, (void*)internalSimInfoPtr, realSize);
       groupResetJobState(ncclGroupJobMainPtr);

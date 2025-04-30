@@ -259,8 +259,8 @@ ncclResult_t printProxyOp(struct ncclProxyArgs* op, int poolIndex, int opIndex) 
   int peer = op->peer;
   bool isColl = (op->pattern != ncclPatternRecv) && (op->pattern != ncclPatternSend);
 
-  fprintf(stderr, "%p [%d-%d|%ld| coll:%d [%s] dtype:%d redOp:%d proto:%d ",
-		  op->self, poolIndex, opIndex, op->opCount, isColl ? op->coll : -1,
+  fprintf(stderr, "%p [%d-%d|%ld| coll:%d comm:%p [%s] dtype:%d redOp:%d proto:%d ",
+		  op->self, poolIndex, opIndex, op->opCount, isColl ? op->coll : -1, op->comm,
 		  op->send ? "SEND" : "RECV", op->dtype, op->redOp, op->protocol);
   for (int s=0; s<op->nsubs; s++) {
     struct ncclProxySubArgs* sub = op->subs+s;
@@ -301,7 +301,6 @@ ncclResult_t dumpProxyState(struct ncclProxyProgressState* state) {
   int poolIndex, opIndex;
   int list_len = 0;
   int sublist_len = 0;
-  ncclCommThreadMain((void*)op->comm);
   fprintf(stderr, "ACTIVE OPS\n");
   while (op) {
     sublist_len = 0;
