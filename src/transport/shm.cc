@@ -381,8 +381,8 @@ static ncclResult_t shmSendProxyProgress(struct ncclProxyState* proxyState, stru
 
         // Return if capturing.
         cudaStreamCaptureStatus captureStatus;
-        CUDACHECK(cudaGraphIsCapturing(resources->stream, captureStatus));
-        if (captureStatus == cudaCaptureStatusActive) return ncclSuccess;
+        CUDACHECK(cudaStreamIsCapturing(resources->stream, &captureStatus));
+        if (captureStatus == cudaStreamCaptureStatusActive) return ncclSuccess;
 
         int buffSlot = (sub->base+sub->done)%NCCL_STEPS;
         cudaError_t res = cudaEventQuery(resources->events[buffSlot]);
@@ -444,8 +444,8 @@ static ncclResult_t shmRecvProxyProgress(struct ncclProxyState* proxyState, stru
 
         // Return if capturing.
         cudaStreamCaptureStatus captureStatus;
-        CUDACHECK(cudaGraphIsCapturing(resources->stream, captureStatus));
-        if (captureStatus == cudaCaptureStatusActive) return ncclSuccess;
+        CUDACHECK(cudaStreamIsCapturing(resources->stream, &captureStatus));
+        if (captureStatus == cudaStreamCaptureStatusActive) return ncclSuccess;
 
         int buffSlot = (sub->base+sub->done)%NCCL_STEPS;
         cudaError_t res = cudaEventQuery(resources->events[buffSlot]);

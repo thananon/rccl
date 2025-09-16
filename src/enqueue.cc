@@ -1651,7 +1651,7 @@ ncclResult_t ncclLaunchPrepare(struct ncclComm* comm) {
 
     bool capturing = ncclCudaGraphValid(planner->capturingGraph);
     enum ncclImplicitOrder implicitOrder;
-    cudaError_t status = cudaErrorNotReady;
+    cudaError_t status = cudaSuccess;
     NCCLCHECKGOTO(getImplicitOrder(&implicitOrder, capturing), result, failure);
 
     if (implicitOrder != ncclImplicitOrderNone) {
@@ -1663,10 +1663,7 @@ ncclResult_t ncclLaunchPrepare(struct ncclComm* comm) {
       NCCLCHECKGOTO(ncclStreamWaitStream(launchStream, launchOrder, comm->sharedRes->scratchEvent), result, failure);
     }
 
-    cudaStreamCaptureStatus captureStatus;
-    CUDACHECK(cudaGraphIsCapturing(resources->stream, captureState));
-
-    if (!persistent && comm->sharedRes->persistentRefs && captureStatus != cudaCaptureStatusActive) status = cudaEventQuery(comm->sharedRes->hostStream.serialEvent);
+    if (!persistent && comm->sharedRes->persistentRefs) status = cudaEventQuery(comm->sharedRes->hostStream.serialEvent);
     if (persistent || ncclCudaLaunchBlocking || status == cudaErrorNotReady) {
       // We have to launch host tasks to push proxy args. We are careful to only
       // do this if necessary since host tasks impose a high performance cost in CUDA.

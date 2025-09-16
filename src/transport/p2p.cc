@@ -823,8 +823,8 @@ static ncclResult_t p2pSendProxyProgress(struct ncclProxyState* proxyState, stru
 
         // Return if capturing.
         cudaStreamCaptureStatus captureStatus;
-        CUDACHECK(cudaGraphIsCapturing(resources->stream, captureStatus));
-        if (captureStatus == cudaCaptureStatusActive) return ncclSuccess;
+        CUDACHECK(cudaStreamIsCapturing(resources->stream, &captureStatus));
+        if (captureStatus == cudaStreamCaptureStatusActive) return ncclSuccess;
 
         int buffSlot = (sub->base+sub->done)%NCCL_STEPS;
 
