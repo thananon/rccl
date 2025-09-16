@@ -32,7 +32,6 @@ option(ENABLE_MSCCLPP_EXECUTOR                 "Enable MSCCL++ Executor"        
 option(ENABLE_MSCCLPP_FORMAT_CHECKS            "Enable formatting checks in MSCCL++"           OFF)
 option(ENABLE_NPKIT                            "Enable NPKit"                                  OFF)
 option(ENABLE_IFC                              "Enable indirect function call"                 OFF)
-option(GENERATE_SYM_KERNELS                    "Generate symmetric memory kernels"             OFF)
 option(INSTALL_DEPENDENCIES                    "Force install dependencies"                    OFF)
 option(ROCTX                                   "Enable ROCTX"                                  ON)
 option(PROFILE                                 "Enable profiling"                              OFF)
@@ -863,18 +862,16 @@ if (gen_py_result)
   message(FATAL_ERROR "${CMAKE_SOURCE_DIR}/src/device/generate.py failed")
 endif()
 
-if (GENERATE_SYM_KERNELS)
-  # Execute the python script to generate required symmetric memory kernels
-  execute_process(
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/device/symmetric/generate.py ${GEN_SYM_DIR}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    RESULT_VARIABLE gen_sym_py_result
-    ERROR_VARIABLE gen_sym_py_error
-  )
-  if (gen_sym_py_result)
-    message(SEND_ERROR "Error: ${gen_sym_py_error}")
-    message(FATAL_ERROR "${CMAKE_SOURCE_DIR}/src/device/symmetric/generate.py failed")
-  endif()
+# Execute the python script to generate required symmetric memory kernels
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/src/device/symmetric/generate.py ${GEN_SYM_DIR}
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  RESULT_VARIABLE gen_sym_py_result
+  ERROR_VARIABLE gen_sym_py_error
+)
+if (gen_sym_py_result)
+  message(SEND_ERROR "Error: ${gen_sym_py_error}")
+  message(FATAL_ERROR "${CMAKE_SOURCE_DIR}/src/device/symmetric/generate.py failed")
 endif()
 
 # Find the generated files in the output directory
